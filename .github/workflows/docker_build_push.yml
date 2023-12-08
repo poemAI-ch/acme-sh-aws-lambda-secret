@@ -1,0 +1,40 @@
+name: Build and Push Docker Image
+
+on:
+  push:
+    branches:
+      - main
+    tags:
+      - '*'
+
+env:
+  DOCKER_HUB_USERNAME: ${{ vars.DOCKER_HUB_USERNAME }}  # Using a configuration variable
+  DOCKER_HUB_TOKEN: ${{ secrets.DOCKER_HUB_TOKEN }}  # Using a secret
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v2
+
+      - name: Log in to Docker Hub
+        run: echo "${DOCKER_HUB_TOKEN}" | docker login -u "${DOCKER_HUB_USERNAME}" --password-stdin
+
+      - name: Build and push Docker image
+        run: |
+          PROJECT_NAME="${GITHUB_REPOSITORY#*/}"
+          COMMIT_HASH_SHORT=$(echo "${{ github.sha }}" | cut -c1-7)
+          IMAGE_BASE_NAME="${DOCKER_HUB_USERNAME}/${PROJECT_NAME}"
+          echo "IMAGE_BASE_NAME=${IMAGE_BASE_NAME}"
+
+          IMAGE_LATEST_NAME=${IMAGE_BASE_NAME}:latest
+          echo "IMAGE_LATEST_NAME=${IMAGE_LATEST_NAME}"
+          IMAGE_COMMIT_NAME=${IMAGE_BASE_NAME}:${COMMIT_HASH_SHORT}
+          IMAGE_REF_NAME=${IMAGE_BASE_NAME}:${GITHUB_REF_NAME}
+          cd inside_container
+          docker build -t ${IMAGE_LATEST_NAME} -t ${IMAGE_COMMIT_NAME} -t ${IMAGE_REF_NAME} .
+          docker push ${IMAGE_LATEST_NAME}
+          docker push ${IMAGE_COMMIT_NAME}
+          docker push ${IMAGE_REF_NAME}
