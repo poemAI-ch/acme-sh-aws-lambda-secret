@@ -1,0 +1,87 @@
+Parameters:
+  ContainerImageUri:
+    Description: The URI of the container image
+    Type: String
+
+  SecretName:
+    Description: The name of the cert secret
+    Type: String
+
+  Email:
+    Description: The email address to use for registration
+    Type: String
+
+  Domains:
+    Description: The domains to register
+    Type: String
+
+Resources:
+  AcmeshAWSLambdaSecretFunction:
+    Type: AWS::Serverless::Function
+    Properties:
+      PackageType: Image
+      ImageUri: !Ref ContainerImageUri
+      MemorySize: 400
+      Timeout: 500
+      Tracing: Active
+      Environment:
+        Variables:
+          SECRET_NAME: !Ref SecretName
+          EMAIL: !Ref Email
+          DOMAINS: !Ref Domains
+
+      Policies:
+      - Version: '2012-10-17'
+        Statement:
+          - Effect: Allow
+            Action:
+              - logs:CreateLogGroup
+              - logs:CreateLogStream
+              - logs:PutLogEvents
+            Resource: '*'
+          - Effect: Allow
+            Action:
+              - secretsmanager:GetSecretValue
+              - secretsmanager:UpdateSecret
+              - secretsmanager:CreateSecret
+            Resource:
+              Fn::Sub: arn:aws:secretsmanager:${AWS::Region}:${AWS::AccountId}:secret:${SecretName}-*
+
+  LambdaScheduleRule:
+    Type: AWS::Events::Rule
+    Properties:
+      ScheduleExpression: "rate(30 days)"
+      State: "ENABLED"
+      Targets:
+        - Arn:
+            Fn::GetAtt:
+              - AcmeshAWSLambdaSecretFunction
+              - Arn
+          Id: "AcmeshLambdaTarget"
+
+  LambdaInvokePermission:
+    Type: AWS::Lambda::Permission
+    Properties:
+      FunctionName:
+        Ref: AcmeshAWSLambdaSecretFunction
+      Action: "lambda:InvokeFunction"
+      Principal: "events.amazonaws.com"
+      SourceArn:
+        Fn::GetAtt:
+          - LambdaScheduleRule
+          - Arn
+
+
+  AcmeshAWSLambdaSecretFunctionLogGroup:
+    Type: AWS::Logs::LogGroup
+    DeletionPolicy: Retain
+    Properties:
+      LogGroupName:
+        Fn::Sub: /aws/lambda/${AcmeshAWSLambdaSecretFunction}
+    Metadata:
+      SamResourceId: AcmeshAWSLambdaSecretFunctionLogGroup
+
+Transform: AWS::Serverless-2016-10-31
+
+
+
