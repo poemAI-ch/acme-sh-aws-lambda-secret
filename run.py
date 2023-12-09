@@ -39,23 +39,23 @@ def get_cert_info(cert_data):
     return cert_info
 
 
-def streamline_tag_keys(tags):
+def streamline_tags(tags):
     """
-    Streamlines tag keys to conform with AWS restrictions:
+    Streamlines tag keys and values to conform with AWS restrictions:
     - Removes non-legal characters.
-    - Shortens keys to a maximum of 128 characters.
+    - Shortens keys to a maximum of 128 characters and values to 256 characters.
     """
     streamlined_tags = {}
     # Allowed characters: letters, numbers, space, . - _ : / + =
     pattern = re.compile(r"[^A-Za-z0-9 \.\-\_\:\+\/=]")
 
     for key, value in tags.items():
-        # Remove non-legal characters
-        cleaned_key = re.sub(pattern, "", key)
-        # Shorten key to 128 characters if necessary
-        if len(cleaned_key) > 128:
-            cleaned_key = cleaned_key[:128]
-        streamlined_tags[cleaned_key] = str(value)
+        # Remove non-legal characters and shorten keys
+        cleaned_key = re.sub(pattern, "", key)[:128]
+        # Remove non-legal characters and shorten values
+        cleaned_value = re.sub(pattern, "", str(value))[:256]
+
+        streamlined_tags[cleaned_key] = cleaned_value
 
     return streamlined_tags
 
@@ -241,7 +241,7 @@ def run_acme():
         return {"message": "no certificates found"}
 
     # Create a Secrets Manager client
-    client = boto3.client("secretsmanager")
+    secrets_manager_client = boto3.client("secretsmanager")
 
     cert_infos = []
     for domain in certs:
@@ -272,10 +272,10 @@ def run_acme():
         if "subject_alt_names" in first_cert_info:
             tags["SubjectAltNames"] = first_cert_info["subject_alt_names"]
 
-    tags = streamline_tag_keys(tags)
+    tags = streamline_tags(tags)
 
     # Create or update the secret
-    create_or_update_secret(client, secret_name, certs, tags=tags)
+    create_or_update_secret(secrets_manager_client, secret_name, certs, tags=tags)
 
     cert_files = []
     for domain in certs:
@@ -285,10 +285,27 @@ def run_acme():
     return {"message": "success", "cert_files": cert_files, "secret_name": secret_name}
 
 
+class StdoutLogger:
+    def __init__(self):
+        pass
+
+    def info(self, message):
+        print(message)
+
+    def error(self, message):
+        print(message)
+
+    def warning(self, message):
+        print(message)
+
+    def debug(self, message):
+        print(message)
+
+
 def handler(event, context):
     global _logger
-    # refresh the logger
-    _logger = logging.getLogger()
+
+    _logger = StdoutLogger()
 
     _logger.info(f"Running lambda handler, event: {event}, context: {context}")
     return run_acme()
