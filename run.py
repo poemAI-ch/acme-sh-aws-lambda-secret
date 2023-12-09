@@ -231,7 +231,7 @@ def run_acme():
     _logger.info("Starting acme.sh")
 
     domains_options = " ".join([f'-d "{domain}"' for domain in domains])
-    commandline = f"/tmp/acme_sh/acme.sh --issue --server zerossl  {domains_options} --home /tmp/acme_sh --cert-home /tmp/certs --config-home /tmp/data --dns dns_aws --debug 2"
+    commandline = f"/tmp/acme_sh/acme.sh --issue --server zerossl  {domains_options} --home /tmp/acme_sh --cert-home /tmp/certs --config-home /tmp/data --dns dns_aws --debug 1"
 
     return_code = run_command_with_streaming(commandline)
     _logger.info(f"Command finished with return code: {return_code}")
@@ -250,7 +250,7 @@ def run_acme():
 
     cert_infos = []
     for domain in certs:
-        for cert_file_name, cert_text in certs[domain]:
+        for cert_file_name, cert_text in certs[domain].items():
             if cert_file_name.endswith(".cer"):
                 if any([domain in cert_file_name for domain in domains]):
                     # Found a certificate for one of the domains
