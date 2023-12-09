@@ -204,10 +204,11 @@ def run_lambda():
     lambda_runtime_api_addr = os.environ["AWS_LAMBDA_RUNTIME_API"]
     app_root = os.environ.get("APP_ROOT", "/root")
 
+    handler_name = "run.handler"
     _logger.info(
-        f"Starting awslambdaric, app_root: {app_root}, lambda_runtime_api_addr: {lambda_runtime_api_addr}"
+        f"Starting awslambdaric, app_root: {app_root}, lambda_runtime_api_addr: {lambda_runtime_api_addr} handler: {handler_name}"
     )
-    run(app_root, handler, lambda_runtime_api_addr)
+    run(app_root, handler_name, lambda_runtime_api_addr)
 
 
 def main():
