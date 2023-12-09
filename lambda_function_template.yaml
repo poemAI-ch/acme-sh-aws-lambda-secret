@@ -46,6 +46,14 @@ Resources:
               - secretsmanager:CreateSecret
             Resource:
               Fn::Sub: arn:aws:secretsmanager:${AWS::Region}:${AWS::AccountId}:secret:${SecretName}-*
+          - Effect: Allow
+            Action:
+              - route53:ChangeResourceRecordSets
+              - route53:ListResourceRecordSets
+              - route53:GetChange
+              - route53:ChangeTagsForResource
+              - route53:ListHostedZones
+            Resource: "*"
 
   LambdaScheduleRule:
     Type: AWS::Events::Rule

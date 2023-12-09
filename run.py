@@ -6,9 +6,63 @@ import subprocess
 import glob
 import threading
 from awslambdaric.bootstrap import run
+from datetime import datetime, timezone
 
+from cryptography import x509
+from cryptography.hazmat.backends import default_backend
+import json
+import re
+
+
+logging.basicConfig(
+    level=logging.INFO,
+    format="%(asctime)s - %(name)s - %(levelname)s - %(message)s",
+)
 
 _logger = logging.getLogger(__name__)
+
+
+def get_cert_info(cert_data):
+    cert = x509.load_pem_x509_certificate(cert_data.encode("utf-8"), default_backend())
+    cert_info = {
+        "subject": cert.subject.rfc4514_string(),
+        "issuer": cert.issuer.rfc4514_string(),
+        "not_valid_before": cert.not_valid_before.isoformat(),
+        "not_valid_after": cert.not_valid_after.isoformat(),
+        "serial_number": cert.serial_number,
+        "signature_algorithm": cert.signature_algorithm_oid._name,
+    }
+
+    subject_alt_names = []
+    for extension in cert.extensions:
+        if isinstance(extension.value, x509.SubjectAlternativeName):
+            for name in extension.value:
+                subject_alt_names.append(name.value)
+    if len(subject_alt_names) > 0:
+        cert_info["subject_alt_names"] = ",".join(subject_alt_names)
+
+    return cert_info
+
+
+def streamline_tag_keys(tags):
+    """
+    Streamlines tag keys to conform with AWS restrictions:
+    - Removes non-legal characters.
+    - Shortens keys to a maximum of 128 characters.
+    """
+    streamlined_tags = {}
+    # Allowed characters: letters, numbers, space, . - _ : / + =
+    pattern = re.compile(r"[^A-Za-z0-9 \.\-\_\:\+\/=]")
+
+    for key, value in tags.items():
+        # Remove non-legal characters
+        cleaned_key = re.sub(pattern, "", key)
+        # Shorten key to 128 characters if necessary
+        if len(cleaned_key) > 128:
+            cleaned_key = cleaned_key[:128]
+        streamlined_tags[cleaned_key] = value
+
+    return streamlined_tags
 
 
 def stream_output(pipe, logger_method):
@@ -78,7 +132,7 @@ def find_certificates(base_path):
     return certs
 
 
-def create_or_update_secret(client, secret_name, cert_data):
+def create_or_update_secret(client, secret_name, cert_data, tags=None):
     try:
         try:
             # Try to get the secret to determine if it exists
@@ -97,6 +151,12 @@ def create_or_update_secret(client, secret_name, cert_data):
             # Create a new secret
             client.create_secret(Name=secret_name, SecretString=secret_string)
             _logger.info(f"Created secret: {secret_name}")
+
+        # Add or update tags if provided
+        if tags:
+            formatted_tags = [{"Key": k, "Value": v} for k, v in tags.items()]
+            client.tag_resource(SecretId=secret_name, Tags=formatted_tags)
+            _logger.info(f"Tags updated for secret: {secret_name}")
 
     except Exception as e:
         _logger.error(f"Error creating/updating secret {secret_name}: {e}")
@@ -188,8 +248,39 @@ def run_acme():
     # Create a Secrets Manager client
     client = boto3.client("secretsmanager")
 
+    cert_infos = []
+    for domain in certs:
+        for cert_file_name, cert_text in certs[domain]:
+            if cert_file_name.endswith(".cer"):
+                if any([domain in cert_file_name for domain in domains]):
+                    # Found a certificate for one of the domains
+
+                    cert_info = get_cert_info(cert_text)
+                    _logger.info(
+                        f"Certificate info for {domain}/{cert_file}:\n{json.dumps(cert_info, indent=4, sort_keys=True, default=str)}"
+                    )
+                    cert_infos.append(cert_info)
+
+    now_iso_date = datetime.now(timezone.utc).isoformat()
+    tags = {"issued_at": now_iso_date}
+
+    if len(cert_infos) > 0:
+        first_cert_info = cert_infos[0]
+        tags = {
+            "Subject": first_cert_info["subject"],
+            "Issuer": first_cert_info["issuer"],
+            "NotBefore": first_cert_info["not_valid_before"],
+            "NotAfter": first_cert_info["not_valid_after"],
+            "SerialNumber": first_cert_info["serial_number"],
+            "SignatureAlgorithm": first_cert_info["signature_algorithm"],
+        }
+        if "subject_alt_names" in first_cert_info:
+            tags["SubjectAltNames"] = first_cert_info["subject_alt_names"]
+
+    tags = streamline_tag_keys(tags)
+
     # Create or update the secret
-    create_or_update_secret(client, secret_name, certs)
+    create_or_update_secret(client, secret_name, certs, tags=tags)
 
     cert_files = []
     for domain in certs:
@@ -220,10 +311,6 @@ def main():
         _logger.info("We are running in AWS Lambda")
         run_lambda()
     else:
-        logging.basicConfig(
-            level=logging.INFO,
-            format="%(asctime)s - %(name)s - %(levelname)s - %(message)s",
-        )
         run_acme()
 
 
