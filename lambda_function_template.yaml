@@ -82,7 +82,7 @@ Resources:
 
   AcmeshAWSLambdaSecretFunctionLogGroup:
     Type: AWS::Logs::LogGroup
-    DeletionPolicy: Retain
+    DeletionPolicy: Delete
     Properties:
       LogGroupName:
         Fn::Sub: /aws/lambda/${AcmeshAWSLambdaSecretFunction}

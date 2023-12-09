@@ -14,11 +14,6 @@ import json
 import re
 
 
-logging.basicConfig(
-    level=logging.INFO,
-    format="%(asctime)s - %(name)s - %(levelname)s - %(message)s",
-)
-
 _logger = logging.getLogger(__name__)
 
 
@@ -257,7 +252,7 @@ def run_acme():
 
                     cert_info = get_cert_info(cert_text)
                     _logger.info(
-                        f"Certificate info for {domain}/{cert_file}:\n{json.dumps(cert_info, indent=4, sort_keys=True, default=str)}"
+                        f"Certificate info for {domain}/{cert_file_name}:\n{json.dumps(cert_info, indent=4, sort_keys=True, default=str)}"
                     )
                     cert_infos.append(cert_info)
 
@@ -308,9 +303,15 @@ def run_lambda():
 
 def main():
     if os.environ.get("AWS_LAMBDA_RUNTIME_API"):
+        _logger.setLevel(logging.INFO)
         _logger.info("We are running in AWS Lambda")
         run_lambda()
     else:
+        logging.basicConfig(
+            level=logging.INFO,
+            format="%(asctime)s - %(name)s - %(levelname)s - %(message)s",
+        )
+
         run_acme()
 
 
