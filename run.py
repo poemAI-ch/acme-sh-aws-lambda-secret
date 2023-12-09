@@ -262,6 +262,7 @@ def run_acme():
     if len(cert_infos) > 0:
         first_cert_info = cert_infos[0]
         tags = {
+            **tags,
             "Subject": first_cert_info["subject"],
             "Issuer": first_cert_info["issuer"],
             "NotBefore": first_cert_info["not_valid_before"],
