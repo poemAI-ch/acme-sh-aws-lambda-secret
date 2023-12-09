@@ -14,7 +14,7 @@ import json
 import re
 
 
-_logger = logging.getLogger(__name__)
+_logger = logging.getLogger()
 
 
 def get_cert_info(cert_data):
@@ -55,7 +55,7 @@ def streamline_tag_keys(tags):
         # Shorten key to 128 characters if necessary
         if len(cleaned_key) > 128:
             cleaned_key = cleaned_key[:128]
-        streamlined_tags[cleaned_key] = value
+        streamlined_tags[cleaned_key] = str(value)
 
     return streamlined_tags
 
@@ -286,6 +286,10 @@ def run_acme():
 
 
 def handler(event, context):
+    global _logger
+    # refresh the logger
+    _logger = logging.getLogger()
+
     _logger.info(f"Running lambda handler, event: {event}, context: {context}")
     return run_acme()
 
@@ -303,7 +307,6 @@ def run_lambda():
 
 def main():
     if os.environ.get("AWS_LAMBDA_RUNTIME_API"):
-        _logger.setLevel(logging.INFO)
         _logger.info("We are running in AWS Lambda")
         run_lambda()
     else:

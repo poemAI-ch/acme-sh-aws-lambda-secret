@@ -29,6 +29,7 @@ Resources:
           SECRET_NAME: !Ref SecretName
           EMAIL: !Ref Email
           DOMAINS: !Ref Domains
+          AWS_LAMBDA_LOG_LEVEL: INFO
 
       Policies:
       - Version: '2012-10-17'
