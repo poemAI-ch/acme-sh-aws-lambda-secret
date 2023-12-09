@@ -4,9 +4,12 @@ RUN apt-get update && apt-get install -y \
     wget curl \
     && rm -rf /var/lib/apt/lists/*
 
-RUN wget -O acme_sh_install.sh  "https://get.acme.sh"
+WORKDIR /app
 
-RUN chmod +x acme_sh_install.sh
+RUN wget -O master.tar.gz  "https://github.com/acmesh-official/acme.sh/archive/master.tar.gz"
+RUN tar xvzf master.tar.gz acme.sh-master/acme.sh && mv acme.sh-master/acme.sh . && rm -rf acme.sh-master master.tar.gz
+
+RUN chmod +x acme.sh
 
 COPY requirements.txt .
 
