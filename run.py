@@ -8,9 +8,6 @@ import threading
 from awslambdaric.bootstrap import run
 
 
-logging.basicConfig(
-    level=logging.INFO, format="%(asctime)s - %(name)s - %(levelname)s - %(message)s"
-)
 _logger = logging.getLogger(__name__)
 
 
@@ -166,17 +163,15 @@ def run_acme():
     os.system("mkdir -p /tmp/data")
     os.chdir("/tmp/")
 
-    
-    os.system(f"/app/acme.sh --install-online --accountemail {email}  --no-profile  --force --home /tmp/acme_sh --cert-home /tmp/certs --config-home /tmp/data")
-
+    os.system(
+        f"/app/acme.sh --install-online --accountemail {email}  --no-profile  --force --home /tmp/acme_sh --cert-home /tmp/certs --config-home /tmp/data"
+    )
 
     # start the acme.sh process as subprocess
     _logger.info("Starting acme.sh")
 
     domains_options = " ".join([f'-d "{domain}"' for domain in domains])
-    commandline = (
-        f"/tmp/acme_sh/acme.sh --issue --server zerossl  {domains_options} --home /tmp/acme_sh --cert-home /tmp/certs --config-home /tmp/data --dns dns_aws --debug 2"
-    )
+    commandline = f"/tmp/acme_sh/acme.sh --issue --server zerossl  {domains_options} --home /tmp/acme_sh --cert-home /tmp/certs --config-home /tmp/data --dns dns_aws --debug 2"
 
     return_code = run_command_with_streaming(commandline)
     _logger.info(f"Command finished with return code: {return_code}")
@@ -225,6 +220,10 @@ def main():
         _logger.info("We are running in AWS Lambda")
         run_lambda()
     else:
+        logging.basicConfig(
+            level=logging.INFO,
+            format="%(asctime)s - %(name)s - %(levelname)s - %(message)s",
+        )
         run_acme()
 
 
